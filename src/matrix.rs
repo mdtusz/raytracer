@@ -31,6 +31,10 @@ impl Vec3 {
     pub fn normalize(&self) -> Self {
         *self / self.length()
     }
+
+    pub fn dot(&self, other: Self) -> f32 {
+        self.x() * other.x() + self.y() * other.y() + self.z() * other.z()
+    }
 }
 
 impl Default for Vec3 {
