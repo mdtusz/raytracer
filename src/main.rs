@@ -51,7 +51,7 @@ impl PixMap {
     }
 }
 
-struct Ray {
+pub struct Ray {
     origin: Vec3,
     vec: Vec3,
 }
