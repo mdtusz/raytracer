@@ -3,15 +3,19 @@ use crate::matrix::Vec3;
 pub struct Color(u8, u8, u8);
 
 impl Color {
-    fn r(&self) -> u8 {
+    pub fn new(r: u8, g: u8, b: u8) -> Self {
+        Color(r, g, b)
+    }
+
+    pub fn r(&self) -> u8 {
         self.0
     }
 
-    fn g(&self) -> u8 {
+    pub fn g(&self) -> u8 {
         self.1
     }
 
-    fn b(&self) -> u8 {
+    pub fn b(&self) -> u8 {
         self.2
     }
 }
