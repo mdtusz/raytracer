@@ -1,24 +1,33 @@
 mod color;
 mod matrix;
+mod solids;
 
 use color::Color;
 use matrix::Vec3;
+use solids::Sphere;
 
 fn main() {
     let mut pm = PixMap::default();
 
+    let origin = Vec3::default();
     let upper_left = Vec3::new(-2.0, 1.0, -1.0);
     let horizontal = Vec3::new(4.0, 0.0, 0.0);
     let vertical = Vec3::new(0.0, 2.0, 0.0);
+
+    let sphere = Sphere::new(Vec3::new(0.0, 0.0, -1.0), 0.5);
 
     for j in 0..pm.height {
         for i in 0..pm.width {
             let u = i as f32 / pm.width as f32;
             let v = j as f32 / pm.height as f32;
 
-            let ray = Ray::new(Vec3::default(), upper_left + u * horizontal - v * vertical);
+            let ray = Ray::new(origin, upper_left + u * horizontal - v * vertical);
 
-            pm.pixels.push(ray.color());
+            if sphere.hit(&ray) {
+                pm.pixels.push(Color::new(255, 0, 0));
+            } else {
+                pm.pixels.push(ray.color());
+            }
         }
     }
 
