@@ -43,8 +43,8 @@ struct PixMap {
 impl Default for PixMap {
     fn default() -> Self {
         Self {
-            width: 200,
-            height: 100,
+            width: 1600,
+            height: 800,
             pixels: Vec::new(),
         }
     }
