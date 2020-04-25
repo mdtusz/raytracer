@@ -10,18 +10,23 @@ fn main() {
     let mut pm = PixMap::default();
 
     let origin = Vec3::default();
-    let upper_left = Vec3::new(-2.0, 1.0, -1.0);
-    let horizontal = Vec3::new(4.0, 0.0, 0.0);
-    let vertical = Vec3::new(0.0, 2.0, 0.0);
+    let aspect_ratio = pm.width as f32 / pm.height as f32;
 
-    let sphere = Sphere::new(Vec3::new(0.0, 0.0, -1.0), 0.5);
+    let sphere = Sphere::new(Vec3::new(0.0, 0.0, -2.0), 0.5);
 
     for j in 0..pm.height {
         for i in 0..pm.width {
-            let u = i as f32 / pm.width as f32;
-            let v = j as f32 / pm.height as f32;
+            // UV coordinates are on a cartesian plane from -1 to 1.
+            let u = i as f32 / pm.width as f32 - 0.5;
+            let v = j as f32 / pm.height as f32 - 0.5;
 
-            let ray = Ray::new(origin, upper_left + u * horizontal - v * vertical);
+            // Decreasing this value will zoom in the view.
+            // It is the "depth" of the rendering plane, so decreasing the
+            // value essentially pushes the screen further away and our field
+            // of view decreases as the frustum narrows.
+            let w = -0.5;
+
+            let ray = Ray::new(origin, Vec3::new(u * aspect_ratio, v, w));
 
             if sphere.hit(&ray) {
                 pm.pixels.push(Color::new(255, 0, 0));
@@ -43,8 +48,8 @@ struct PixMap {
 impl Default for PixMap {
     fn default() -> Self {
         Self {
-            width: 1600,
-            height: 800,
+            width: 500,
+            height: 500,
             pixels: Vec::new(),
         }
     }
