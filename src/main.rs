@@ -7,10 +7,18 @@ use matrix::Vec3;
 fn main() {
     let mut pm = PixMap::default();
 
-    for i in 0..pm.width {
-        for j in 0..pm.height {
-            let color = Vec3::new(i as f32 / pm.width as f32, j as f32 / pm.height as f32, 0.2);
-            pm.pixels.push(color.into());
+    let upper_left = Vec3::new(-2.0, 1.0, -1.0);
+    let horizontal = Vec3::new(4.0, 0.0, 0.0);
+    let vertical = Vec3::new(0.0, 2.0, 0.0);
+
+    for j in 0..pm.height {
+        for i in 0..pm.width {
+            let u = i as f32 / pm.width as f32;
+            let v = j as f32 / pm.height as f32;
+
+            let ray = Ray::new(Vec3::default(), upper_left + u * horizontal - v * vertical);
+
+            pm.pixels.push(ray.color());
         }
     }
 
@@ -26,8 +34,8 @@ struct PixMap {
 impl Default for PixMap {
     fn default() -> Self {
         Self {
-            width: 512,
-            height: 512,
+            width: 200,
+            height: 100,
             pixels: Vec::new(),
         }
     }
@@ -49,6 +57,10 @@ struct Ray {
 }
 
 impl Ray {
+    pub fn new(origin: Vec3, vec: Vec3) -> Self {
+        Ray { origin, vec }
+    }
+
     pub fn origin(&self) -> Vec3 {
         self.origin
     }
@@ -59,5 +71,15 @@ impl Ray {
 
     pub fn at(&self, t: f32) -> Vec3 {
         self.origin + self.vec * t
+    }
+
+    pub fn color(&self) -> Color {
+        let unit_dir = self.direction().normalize();
+
+        let t = 0.5 * (unit_dir.y() + 1.0);
+
+        let c = (1.0 - t) * Vec3::new(1.0, 1.0, 1.0) + t * Vec3::new(0.0, 0.7, 1.0);
+
+        c.into()
     }
 }
