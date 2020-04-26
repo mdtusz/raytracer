@@ -14,8 +14,6 @@ use solids::Sphere;
 fn main() {
     let mut pm = PixMap::default();
 
-    let origin = Vec3::default();
-
     let s1 = Sphere::new(Vec3::new(0.0, -100.5, -1.0), 100.0);
     let s2 = Sphere::new(Vec3::new(0.0, 0.0, -1.0), 0.1);
 
@@ -53,7 +51,7 @@ fn main() {
 
                 let ray = camera.get_ray(u, v, w);
 
-                match world.hit(&ray, 0.0, 1000000000000000.0) {
+                match world.hit(&ray, 0.0, f32::INFINITY) {
                     Some(h) => {
                         let color = 0.5
                             * Vec3::new(h.normal.x() + 1.0, h.normal.y() + 1.0, h.normal.z() + 1.0);
