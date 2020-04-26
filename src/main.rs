@@ -15,7 +15,7 @@ fn main() {
     let mut pm = PixMap::default();
 
     let s1 = Sphere::new(Vec3::new(0.0, -100.5, -1.0), 100.0);
-    let s2 = Sphere::new(Vec3::new(0.0, 0.0, -1.0), 0.1);
+    let s2 = Sphere::new(Vec3::new(0.0, 0.0, -1.0), 0.5);
 
     let mut objects: Vec<Box<dyn Hittable>> = Vec::new();
 
@@ -30,14 +30,20 @@ fn main() {
     };
 
     let aa_samples = 100;
+    let max_depth = 128_000;
 
     for j in 0..pm.height {
         for i in 0..pm.width {
             let mut samples = Vec::new();
 
-            for _ in 0..aa_samples {
-                let sample_i = i as f32 + random::<f32>();
-                let sample_j = j as f32 + random::<f32>();
+            for s in 0..aa_samples {
+                let mut sample_i = i as f32;
+                let mut sample_j = j as f32;
+
+                if s > 0 {
+                    sample_i += random::<f32>() - 0.5;
+                    sample_j += random::<f32>() - 0.5;
+                }
 
                 // UV coordinates are on a cartesian plane from -1 to 1.
                 let u = sample_i / pm.width as f32 - 0.5;
@@ -47,20 +53,12 @@ fn main() {
                 // It is the "depth" of the rendering plane, so decreasing the
                 // value essentially pushes the screen further away and our field
                 // of view decreases as the frustum narrows.
-                let w = -1.0;
+                let w = -0.7;
 
                 let ray = camera.get_ray(u, v, w);
 
-                match world.hit(&ray, 0.0, f32::INFINITY) {
-                    Some(h) => {
-                        let color = 0.5
-                            * Vec3::new(h.normal.x() + 1.0, h.normal.y() + 1.0, h.normal.z() + 1.0);
-                        samples.push(color);
-                    }
-                    None => {
-                        samples.push(ray.color());
-                    }
-                }
+                let sample = ray.trace(&world, max_depth);
+                samples.push(sample);
             }
 
             let summed: Vec3 = samples.iter().sum();
@@ -139,6 +137,22 @@ impl Ray {
 
         c
     }
+
+    pub fn trace(&self, world: &Hittables, depth: u32) -> Vec3 {
+        if depth <= 0 {
+            return Vec3::default();
+        }
+
+        let unit_sphere = Sphere::unit();
+        match world.hit(&self, 0.0, f32::INFINITY) {
+            Some(hit) => {
+                let target = hit.point + hit.normal + unit_sphere.random_point_within();
+                let ray = Ray::new(hit.point, target - hit.point);
+                0.5 * ray.trace(world, depth - 1)
+            }
+            None => self.color(),
+        }
+    }
 }
 
 trait Hittable {
@@ -173,7 +187,7 @@ impl Hit {
     }
 }
 
-struct Hittables {
+pub struct Hittables {
     objects: Vec<Box<dyn Hittable>>,
 }
 
