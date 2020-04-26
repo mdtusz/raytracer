@@ -1,3 +1,4 @@
+use std::iter::Sum;
 use std::ops::{Add, Div, Mul, Neg, Sub};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -96,5 +97,14 @@ impl Neg for Vec3 {
 
     fn neg(self) -> Self::Output {
         Self(-self.0, -self.1, -self.2)
+    }
+}
+
+impl<'a> Sum<&'a Self> for Vec3 {
+    fn sum<I>(iter: I) -> Self
+    where
+        I: Iterator<Item = &'a Self>,
+    {
+        iter.fold(Vec3::default(), |acc, v| *v + acc)
     }
 }
