@@ -12,7 +12,7 @@ fn main() {
     let origin = Vec3::default();
     let aspect_ratio = pm.width as f32 / pm.height as f32;
 
-    let sphere = Sphere::new(Vec3::new(0.0, 0.0, -2.0), 0.5);
+    let sphere = Sphere::new(Vec3::new(0.0, 0.0, -1.0), 0.1);
 
     for j in 0..pm.height {
         for i in 0..pm.width {
@@ -24,12 +24,15 @@ fn main() {
             // It is the "depth" of the rendering plane, so decreasing the
             // value essentially pushes the screen further away and our field
             // of view decreases as the frustum narrows.
-            let w = -0.5;
+            let w = -1.0;
 
             let ray = Ray::new(origin, Vec3::new(u * aspect_ratio, v, w));
 
-            if sphere.hit(&ray) {
-                pm.pixels.push(Color::new(255, 0, 0));
+            let t = sphere.hit(&ray);
+            if t > 0.0 {
+                let n = (ray.at(t) - sphere.center).normalize();
+                let color = 0.5 * Vec3::new(n.x() + 1.0, n.y() + 1.0, n.z() + 1.0);
+                pm.pixels.push(color.into());
             } else {
                 pm.pixels.push(ray.color());
             }
@@ -48,8 +51,8 @@ struct PixMap {
 impl Default for PixMap {
     fn default() -> Self {
         Self {
-            width: 500,
-            height: 500,
+            width: 1920,
+            height: 1080,
             pixels: Vec::new(),
         }
     }
