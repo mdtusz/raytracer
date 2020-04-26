@@ -1,6 +1,8 @@
 use std::fs::File;
 use std::io::Write;
 
+use rand::random;
+
 mod color;
 mod matrix;
 mod solids;
@@ -29,30 +31,44 @@ fn main() {
         aspect_ratio: pm.width as f32 / pm.height as f32,
     };
 
+    let aa_samples = 100;
+
     for j in 0..pm.height {
         for i in 0..pm.width {
-            // UV coordinates are on a cartesian plane from -1 to 1.
-            let u = i as f32 / pm.width as f32 - 0.5;
-            let v = 1.0 - j as f32 / pm.height as f32 - 0.5;
+            let mut samples = Vec::new();
 
-            // Decreasing this value will zoom in the view.
-            // It is the "depth" of the rendering plane, so decreasing the
-            // value essentially pushes the screen further away and our field
-            // of view decreases as the frustum narrows.
-            let w = -1.0;
+            for _ in 0..aa_samples {
+                let sample_i = i as f32 + random::<f32>();
+                let sample_j = j as f32 + random::<f32>();
 
-            let ray = camera.get_ray(u, v, w);
+                // UV coordinates are on a cartesian plane from -1 to 1.
+                let u = sample_i / pm.width as f32 - 0.5;
+                let v = 1.0 - sample_j / pm.height as f32 - 0.5;
 
-            match world.hit(&ray, 0.0, 1000000000000000.0) {
-                Some(h) => {
-                    let color =
-                        0.5 * Vec3::new(h.normal.x() + 1.0, h.normal.y() + 1.0, h.normal.z() + 1.0);
-                    pm.pixels.push(color.into());
-                }
-                None => {
-                    pm.pixels.push(ray.color());
+                // Decreasing this value will zoom in the view.
+                // It is the "depth" of the rendering plane, so decreasing the
+                // value essentially pushes the screen further away and our field
+                // of view decreases as the frustum narrows.
+                let w = -1.0;
+
+                let ray = camera.get_ray(u, v, w);
+
+                match world.hit(&ray, 0.0, 1000000000000000.0) {
+                    Some(h) => {
+                        let color = 0.5
+                            * Vec3::new(h.normal.x() + 1.0, h.normal.y() + 1.0, h.normal.z() + 1.0);
+                        samples.push(color);
+                    }
+                    None => {
+                        samples.push(ray.color());
+                    }
                 }
             }
+
+            let summed: Vec3 = samples.iter().sum();
+            let color = summed / aa_samples as f32;
+
+            pm.pixels.push(color.into());
         }
     }
 
@@ -116,14 +132,14 @@ impl Ray {
         self.origin + self.vec * t
     }
 
-    pub fn color(&self) -> Color {
+    pub fn color(&self) -> Vec3 {
         let unit_dir = self.direction().normalize();
 
         let t = 0.5 * (unit_dir.y() + 1.0);
 
         let c = (1.0 - t) * Vec3::new(1.0, 1.0, 1.0) + t * Vec3::new(0.0, 0.7, 1.0);
 
-        c.into()
+        c
     }
 }
 
