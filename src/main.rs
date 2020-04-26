@@ -1,3 +1,6 @@
+use std::fs::File;
+use std::io::Write;
+
 mod color;
 mod matrix;
 mod solids;
@@ -49,7 +52,7 @@ fn main() {
         }
     }
 
-    pm.save();
+    pm.save().unwrap();
 }
 
 struct PixMap {
@@ -61,20 +64,29 @@ struct PixMap {
 impl Default for PixMap {
     fn default() -> Self {
         Self {
-            width: 1920,
-            height: 1080,
+            width: 2560,
+            height: 1440,
             pixels: Vec::new(),
         }
     }
 }
 
 impl PixMap {
-    fn save(&self) {
-        println!("P3\n{} {}\n255", self.width, self.height);
+    fn save(&self) -> std::io::Result<()> {
+        let mut file = File::create("test.ppm")?;
+        let mut v: Vec<u8> = Vec::new();
+
+        let header = format!("P3\n{} {}\n255\n", self.width, self.height);
+        v.extend(header.as_bytes());
 
         for color in &self.pixels {
-            println!("{}", color);
+            let color_string = format!("{}\n", color);
+            v.extend(color_string.as_bytes());
         }
+
+        file.write_all(&v)?;
+
+        Ok(())
     }
 }
 
