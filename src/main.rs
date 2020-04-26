@@ -15,7 +15,7 @@ fn main() {
     let origin = Vec3::default();
     let aspect_ratio = pm.width as f32 / pm.height as f32;
 
-    let s1 = Sphere::new(Vec3::new(-0.1, 0.1, -1.0), 0.1);
+    let s1 = Sphere::new(Vec3::new(0.0, -100.5, -1.0), 100.0);
     let s2 = Sphere::new(Vec3::new(0.0, 0.0, -1.0), 0.1);
 
     let mut objects: Vec<Box<dyn Hittable>> = Vec::new();
@@ -29,7 +29,7 @@ fn main() {
         for i in 0..pm.width {
             // UV coordinates are on a cartesian plane from -1 to 1.
             let u = i as f32 / pm.width as f32 - 0.5;
-            let v = j as f32 / pm.height as f32 - 0.5;
+            let v = 1.0 - j as f32 / pm.height as f32 - 0.5;
 
             // Decreasing this value will zoom in the view.
             // It is the "depth" of the rendering plane, so decreasing the
@@ -64,8 +64,8 @@ struct PixMap {
 impl Default for PixMap {
     fn default() -> Self {
         Self {
-            width: 2560,
-            height: 1440,
+            width: 1280,
+            height: 760,
             pixels: Vec::new(),
         }
     }
