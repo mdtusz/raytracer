@@ -29,8 +29,8 @@ fn main() {
         aspect_ratio: pm.width as f32 / pm.height as f32,
     };
 
-    let aa_samples = 100;
-    let max_depth = 128;
+    let aa_samples = 256;
+    let max_depth = 256;
 
     for j in 0..pm.height {
         for i in 0..pm.width {
@@ -53,7 +53,7 @@ fn main() {
                 // It is the "depth" of the rendering plane, so decreasing the
                 // value essentially pushes the screen further away and our field
                 // of view decreases as the frustum narrows.
-                let w = -0.7;
+                let w = -0.25;
 
                 let ray = camera.get_ray(u, v, w);
 
@@ -61,10 +61,9 @@ fn main() {
                 samples.push(sample);
             }
 
-            let summed: Vec3 = samples.iter().sum();
-            let color = summed / aa_samples as f32;
+            let color = Color::from_samples(samples);
 
-            pm.pixels.push(color.into());
+            pm.pixels.push(color);
         }
     }
 
@@ -133,7 +132,7 @@ impl Ray {
 
         let t = 0.5 * (unit_dir.y() + 1.0);
 
-        let c = (1.0 - t) * Vec3::new(1.0, 1.0, 1.0) + t * Vec3::new(0.0, 0.7, 1.0);
+        let c = (1.0 - t) * Vec3::new(1.0, 1.0, 1.0) + t * Vec3::new(0.5, 0.8, 1.0);
 
         c
     }
@@ -146,7 +145,7 @@ impl Ray {
         let unit_sphere = Sphere::unit();
         match world.hit(&self, 0.0001, f32::INFINITY) {
             Some(hit) => {
-                let target = hit.point + hit.normal + unit_sphere.random_point_within();
+                let target = hit.point + hit.normal + unit_sphere.random_point_lambertian();
                 let ray = Ray::new(hit.point, target - hit.point);
                 0.5 * ray.trace(world, depth - 1)
             }
