@@ -10,6 +10,24 @@ impl Sphere {
     pub fn new(center: Vec3, radius: f32) -> Self {
         Sphere { center, radius }
     }
+
+    pub fn unit() -> Self {
+        Self::new(Vec3::default(), 1.0)
+    }
+
+    pub fn random_point_within(&self) -> Vec3 {
+        let p = Vec3::random();
+
+        if self.contains(p) {
+            p
+        } else {
+            self.random_point_within()
+        }
+    }
+
+    fn contains(&self, point: Vec3) -> bool {
+        (point - self.center).length_squared() < self.radius
+    }
 }
 
 impl Hittable for Sphere {
