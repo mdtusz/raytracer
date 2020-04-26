@@ -1,12 +1,18 @@
 use std::iter::Sum;
 use std::ops::{Add, Div, Mul, Neg, Sub};
 
+use rand::random;
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Vec3(f32, f32, f32);
 
 impl Vec3 {
     pub fn new(x: f32, y: f32, z: f32) -> Self {
         Self(x, y, z)
+    }
+
+    pub fn random() -> Self {
+        Self(random(), random(), random())
     }
 
     pub fn x(&self) -> f32 {
