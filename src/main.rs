@@ -13,7 +13,6 @@ fn main() {
     let mut pm = PixMap::default();
 
     let origin = Vec3::default();
-    let aspect_ratio = pm.width as f32 / pm.height as f32;
 
     let s1 = Sphere::new(Vec3::new(0.0, -100.5, -1.0), 100.0);
     let s2 = Sphere::new(Vec3::new(0.0, 0.0, -1.0), 0.1);
@@ -24,6 +23,11 @@ fn main() {
     objects.push(Box::new(s2));
 
     let world = Hittables { objects };
+    let camera = Camera {
+        look_at: Vec3::new(0.0, 0.0, -1.0),
+        position: Vec3::new(0.0, 0.0, 0.0),
+        aspect_ratio: pm.width as f32 / pm.height as f32,
+    };
 
     for j in 0..pm.height {
         for i in 0..pm.width {
@@ -37,7 +41,7 @@ fn main() {
             // of view decreases as the frustum narrows.
             let w = -1.0;
 
-            let ray = Ray::new(origin, Vec3::new(u * aspect_ratio, v, w));
+            let ray = camera.get_ray(u, v, w);
 
             match world.hit(&ray, 0.0, 1000000000000000.0) {
                 Some(h) => {
@@ -169,5 +173,18 @@ impl Hittable for Hittables {
         });
 
         Some(hit).flatten()
+    }
+}
+
+struct Camera {
+    look_at: Vec3,
+    position: Vec3,
+    aspect_ratio: f32,
+}
+
+impl Camera {
+    pub fn get_ray(&self, u: f32, v: f32, w: f32) -> Ray {
+        let origin = Vec3::default();
+        Ray::new(origin, Vec3::new(u * self.aspect_ratio, v, w))
     }
 }
