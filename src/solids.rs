@@ -27,10 +27,10 @@ impl Sphere {
         }
     }
 
-    pub fn random_point_lambertian(&self) -> Vec3 {
+    pub fn random_point_lambertian() -> Vec3 {
         let a = random::<f32>() * 2.0 * std::f32::consts::PI;
         let z = random::<f32>() * 2.0 - 1.0;
-        let r = (1.1 - z * z).sqrt();
+        let r = (1.0 - z * z).sqrt();
 
         Vec3::new(r * a.cos(), r * a.sin(), z)
     }

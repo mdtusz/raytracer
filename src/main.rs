@@ -145,13 +145,33 @@ impl Ray {
         let unit_sphere = Sphere::unit();
         match world.hit(&self, 0.0001, f32::INFINITY) {
             Some(hit) => {
-                let target = hit.point + hit.normal + unit_sphere.random_point_lambertian();
+                let target = hit.point + random_point_hemisphere(hit.normal);
                 let ray = Ray::new(hit.point, target - hit.point);
                 0.5 * ray.trace(world, depth - 1)
             }
             None => self.color(),
         }
     }
+}
+
+// Diffuse
+fn random_point_hemisphere(normal: Vec3) -> Vec3 {
+    let p = Sphere::unit().random_point_within();
+
+    if p.dot(normal) > 0.0 {
+        p
+    } else {
+        -p
+    }
+}
+
+// Diffuse
+fn random_point_lambertian() -> Vec3 {
+    let a = random::<f32>() * 2.0 * std::f32::consts::PI;
+    let z = random::<f32>() * 2.0 - 1.0;
+    let r = (1.0 - z * z).sqrt();
+
+    Vec3::new(r * a.cos(), r * a.sin(), z)
 }
 
 trait Hittable {
