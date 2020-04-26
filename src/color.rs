@@ -7,6 +7,17 @@ impl Color {
         Color(r, g, b)
     }
 
+    pub fn from_samples(samples: Vec<Vec3>) -> Self {
+        let summed: Vec3 = samples.iter().sum();
+        let scale = 1.0 / samples.len() as f32;
+
+        let r = (summed.x() * scale).sqrt().max(0.0).min(1.0);
+        let g = (summed.y() * scale).sqrt().max(0.0).min(1.0);
+        let b = (summed.z() * scale).sqrt().max(0.0).min(1.0);
+
+        Vec3::new(r, g, b).into()
+    }
+
     pub fn r(&self) -> u8 {
         self.0
     }
