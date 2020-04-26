@@ -12,7 +12,15 @@ fn main() {
     let origin = Vec3::default();
     let aspect_ratio = pm.width as f32 / pm.height as f32;
 
-    let sphere = Sphere::new(Vec3::new(0.0, 0.0, -1.0), 0.1);
+    let s1 = Sphere::new(Vec3::new(-0.1, 0.1, -1.0), 0.1);
+    let s2 = Sphere::new(Vec3::new(0.0, 0.0, -1.0), 0.1);
+
+    let mut objects: Vec<Box<dyn Hittable>> = Vec::new();
+
+    objects.push(Box::new(s1));
+    objects.push(Box::new(s2));
+
+    let world = Hittables { objects };
 
     for j in 0..pm.height {
         for i in 0..pm.width {
@@ -28,13 +36,15 @@ fn main() {
 
             let ray = Ray::new(origin, Vec3::new(u * aspect_ratio, v, w));
 
-            let t = sphere.hit(&ray);
-            if t > 0.0 {
-                let n = (ray.at(t) - sphere.center).normalize();
-                let color = 0.5 * Vec3::new(n.x() + 1.0, n.y() + 1.0, n.z() + 1.0);
-                pm.pixels.push(color.into());
-            } else {
-                pm.pixels.push(ray.color());
+            match world.hit(&ray, 0.0, 1000000000000000.0) {
+                Some(h) => {
+                    let color =
+                        0.5 * Vec3::new(h.normal.x() + 1.0, h.normal.y() + 1.0, h.normal.z() + 1.0);
+                    pm.pixels.push(color.into());
+                }
+                None => {
+                    pm.pixels.push(ray.color());
+                }
             }
         }
     }
@@ -98,5 +108,54 @@ impl Ray {
         let c = (1.0 - t) * Vec3::new(1.0, 1.0, 1.0) + t * Vec3::new(0.0, 0.7, 1.0);
 
         c.into()
+    }
+}
+
+trait Hittable {
+    fn hit(&self, ray: &Ray, min: f32, max: f32) -> Option<Hit>;
+}
+
+struct Hit {
+    pub t: f32,
+    pub point: Vec3,
+    pub normal: Vec3,
+    pub front_face: bool,
+}
+
+impl Hit {
+    pub fn new(t: f32, point: Vec3, normal: Vec3, front_face: bool) -> Self {
+        Self {
+            t,
+            point,
+            normal,
+            front_face,
+        }
+    }
+
+    pub fn set_face_normal(&mut self, ray: &Ray, outward_normal: Vec3) {
+        if ray.direction().dot(outward_normal) < 0.0 {
+            self.front_face = true;
+            self.normal = outward_normal;
+        } else {
+            self.front_face = false;
+            self.normal = -outward_normal;
+        }
+    }
+}
+
+struct Hittables {
+    objects: Vec<Box<dyn Hittable>>,
+}
+
+impl Hittable for Hittables {
+    fn hit(&self, ray: &Ray, min: f32, max: f32) -> Option<Hit> {
+        let (_closest, hit) = self.objects.iter().fold((max, None), |acc, object| {
+            match object.hit(ray, min, acc.0) {
+                Some(hit) => (hit.t, Some(hit)),
+                None => acc,
+            }
+        });
+
+        Some(hit).flatten()
     }
 }
