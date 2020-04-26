@@ -30,7 +30,7 @@ fn main() {
     };
 
     let aa_samples = 100;
-    let max_depth = 128_000;
+    let max_depth = 128;
 
     for j in 0..pm.height {
         for i in 0..pm.width {
@@ -144,7 +144,7 @@ impl Ray {
         }
 
         let unit_sphere = Sphere::unit();
-        match world.hit(&self, 0.0, f32::INFINITY) {
+        match world.hit(&self, 0.0001, f32::INFINITY) {
             Some(hit) => {
                 let target = hit.point + hit.normal + unit_sphere.random_point_within();
                 let ray = Ray::new(hit.point, target - hit.point);
