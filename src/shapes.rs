@@ -1,20 +1,26 @@
 use rand::random;
 
+use crate::materials::Material;
 use crate::matrix::Vec3;
 use crate::{Hit, Hittable, Ray};
 
 pub struct Sphere {
     pub center: Vec3,
     pub radius: f32,
+    material: Material,
 }
 
 impl Sphere {
-    pub fn new(center: Vec3, radius: f32) -> Self {
-        Sphere { center, radius }
+    pub fn new(center: Vec3, radius: f32, material: Material) -> Self {
+        Sphere {
+            center,
+            radius,
+            material,
+        }
     }
 
     pub fn unit() -> Self {
-        Self::new(Vec3::default(), 1.0)
+        Self::new(Vec3::default(), 1.0, Material::default())
     }
 
     pub fn random_point_within(&self) -> Vec3 {
@@ -25,14 +31,6 @@ impl Sphere {
         } else {
             self.random_point_within()
         }
-    }
-
-    pub fn random_point_lambertian() -> Vec3 {
-        let a = random::<f32>() * 2.0 * std::f32::consts::PI;
-        let z = random::<f32>() * 2.0 - 1.0;
-        let r = (1.0 - z * z).sqrt();
-
-        Vec3::new(r * a.cos(), r * a.sin(), z)
     }
 
     fn contains(&self, point: Vec3) -> bool {
@@ -58,7 +56,7 @@ impl Hittable for Sphere {
                 let point = ray.at(t);
                 let normal = (point - self.center) / self.radius;
 
-                let mut hit = Hit::new(t, point, normal, false);
+                let mut hit = Hit::new(t, point, normal, false, self.material.clone());
                 hit.set_face_normal(ray, normal);
 
                 return Some(hit);
@@ -69,7 +67,7 @@ impl Hittable for Sphere {
                 let point = ray.at(t);
                 let normal = (point - self.center) / self.radius;
 
-                let mut hit = Hit::new(t, point, normal, false);
+                let mut hit = Hit::new(t, point, normal, false, self.material.clone());
                 hit.set_face_normal(ray, normal);
 
                 return Some(hit);

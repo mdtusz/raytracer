@@ -4,33 +4,43 @@ use std::io::Write;
 use rand::random;
 
 mod color;
+mod materials;
 mod matrix;
-mod solids;
+mod shapes;
 
 use color::Color;
+use materials::{Material, Scatter};
 use matrix::Vec3;
-use solids::Sphere;
+use shapes::Sphere;
 
 fn main() {
     let mut pm = PixMap::default();
 
-    let s1 = Sphere::new(Vec3::new(0.0, -100.5, -1.0), 100.0);
-    let s2 = Sphere::new(Vec3::new(0.0, 0.0, -1.0), 0.5);
+    let pink = Material::Lambertian(Vec3::new(0.5, 0.5, 0.5));
+    let metal = Material::Metal(Vec3::new(0.65, 0.55, 0.5));
+
+    let s1 = Sphere::new(Vec3::new(0.0, -100.5, -1.0), 100.0, pink.clone());
+    let s2 = Sphere::new(Vec3::new(-0.2, 0.0, -1.0), 0.5, metal.clone());
+    let s3 = Sphere::new(Vec3::new(1.0, 0.3, -0.6), 0.3, metal.clone());
+    let s4 = Sphere::new(Vec3::new(0.4, -0.3, -0.1), 0.1, metal.clone());
 
     let mut objects: Vec<Box<dyn Hittable>> = Vec::new();
 
     objects.push(Box::new(s1));
     objects.push(Box::new(s2));
+    objects.push(Box::new(s3));
+    objects.push(Box::new(s4));
 
-    let world = Hittables { objects };
+    let world = World { objects };
+
     let camera = Camera {
-        look_at: Vec3::new(0.0, 0.0, -1.0),
-        position: Vec3::new(0.0, 0.0, 0.0),
+        look_at: Vec3::new(0.2, 0.0, -1.0),
+        position: Vec3::new(0.0, 0.0, 2.0),
         aspect_ratio: pm.width as f32 / pm.height as f32,
     };
 
-    let aa_samples = 256;
-    let max_depth = 256;
+    let aa_samples = 1024;
+    let max_depth = 2024;
 
     for j in 0..pm.height {
         for i in 0..pm.width {
@@ -53,7 +63,7 @@ fn main() {
                 // It is the "depth" of the rendering plane, so decreasing the
                 // value essentially pushes the screen further away and our field
                 // of view decreases as the frustum narrows.
-                let w = -0.25;
+                let w = -1.0;
 
                 let ray = camera.get_ray(u, v, w);
 
@@ -79,8 +89,8 @@ struct PixMap {
 impl Default for PixMap {
     fn default() -> Self {
         Self {
-            width: 1280,
-            height: 760,
+            width: 3840,
+            height: 2160,
             pixels: Vec::new(),
         }
     }
@@ -137,17 +147,22 @@ impl Ray {
         c
     }
 
-    pub fn trace(&self, world: &Hittables, depth: u32) -> Vec3 {
+    pub fn trace(&self, world: &World, depth: u32) -> Vec3 {
         if depth <= 0 {
             return Vec3::default();
         }
 
-        let unit_sphere = Sphere::unit();
         match world.hit(&self, 0.0001, f32::INFINITY) {
             Some(hit) => {
-                let target = hit.point + random_point_hemisphere(hit.normal);
-                let ray = Ray::new(hit.point, target - hit.point);
-                0.5 * ray.trace(world, depth - 1)
+                // let target = hit.point + random_point_hemisphere(hit.normal);
+                // let ray = Ray::new(hit.point, target - hit.point);
+                // 0.5 * ray.trace(world, depth - 1)
+                match hit.material.scatter(&self, &hit) {
+                    Some(reflection) => {
+                        reflection.attenuation * reflection.scatter.trace(world, depth - 1)
+                    }
+                    None => Vec3::default(),
+                }
             }
             None => self.color(),
         }
@@ -165,31 +180,24 @@ fn random_point_hemisphere(normal: Vec3) -> Vec3 {
     }
 }
 
-// Diffuse
-fn random_point_lambertian() -> Vec3 {
-    let a = random::<f32>() * 2.0 * std::f32::consts::PI;
-    let z = random::<f32>() * 2.0 - 1.0;
-    let r = (1.0 - z * z).sqrt();
-
-    Vec3::new(r * a.cos(), r * a.sin(), z)
-}
-
 trait Hittable {
     fn hit(&self, ray: &Ray, min: f32, max: f32) -> Option<Hit>;
 }
 
-struct Hit {
+pub struct Hit {
     pub t: f32,
     pub point: Vec3,
     pub normal: Vec3,
     pub front_face: bool,
+    pub material: Material,
 }
 
 impl Hit {
-    pub fn new(t: f32, point: Vec3, normal: Vec3, front_face: bool) -> Self {
+    pub fn new(t: f32, point: Vec3, normal: Vec3, front_face: bool, material: Material) -> Self {
         Self {
             t,
             point,
+            material,
             normal,
             front_face,
         }
@@ -206,11 +214,11 @@ impl Hit {
     }
 }
 
-pub struct Hittables {
+pub struct World {
     objects: Vec<Box<dyn Hittable>>,
 }
 
-impl Hittable for Hittables {
+impl Hittable for World {
     fn hit(&self, ray: &Ray, min: f32, max: f32) -> Option<Hit> {
         let (_closest, hit) = self.objects.iter().fold((max, None), |acc, object| {
             match object.hit(ray, min, acc.0) {
@@ -231,7 +239,6 @@ struct Camera {
 
 impl Camera {
     pub fn get_ray(&self, u: f32, v: f32, w: f32) -> Ray {
-        let origin = Vec3::default();
-        Ray::new(origin, Vec3::new(u * self.aspect_ratio, v, w))
+        Ray::new(self.position, Vec3::new(u * self.aspect_ratio, v, w))
     }
 }
