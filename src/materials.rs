@@ -10,7 +10,7 @@ pub trait Scatter {
 
 #[derive(Clone)]
 pub enum Material {
-    Metal(Vec3),
+    Metal(Vec3, f32),
     Lambertian(Vec3),
 }
 
@@ -23,9 +23,10 @@ impl Default for Material {
 impl Scatter for Material {
     fn scatter(&self, ray: &Ray, hit: &Hit) -> Option<Reflection> {
         match self {
-            Material::Metal(albedo) => {
+            Material::Metal(albedo, blur) => {
                 let reflected = reflect(ray.direction().normalize(), hit.normal);
-                let scatter = Ray::new(hit.point, reflected);
+                let fuzz = blur.max(0.0).min(1.0) * Sphere::unit().random_point_within();
+                let scatter = Ray::new(hit.point, reflected + fuzz);
 
                 if scatter.direction().dot(hit.normal) > 0.0 {
                     let reflection = Reflection {

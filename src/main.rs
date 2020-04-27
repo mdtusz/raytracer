@@ -16,13 +16,13 @@ use shapes::Sphere;
 fn main() {
     let mut pm = PixMap::default();
 
-    let pink = Material::Lambertian(Vec3::new(0.5, 0.5, 0.5));
-    let metal = Material::Metal(Vec3::new(0.65, 0.55, 0.5));
+    let pink = Material::Lambertian(Vec3::new(0.5, 1.0, 0.5));
+    let mirror = Material::Metal(Vec3::new(0.5, 0.5, 0.5), 0.0);
 
     let s1 = Sphere::new(Vec3::new(0.0, -100.5, -1.0), 100.0, pink.clone());
-    let s2 = Sphere::new(Vec3::new(-0.2, 0.0, -1.0), 0.5, metal.clone());
-    let s3 = Sphere::new(Vec3::new(1.0, 0.3, -0.6), 0.3, metal.clone());
-    let s4 = Sphere::new(Vec3::new(0.4, -0.3, -0.1), 0.1, metal.clone());
+    let s2 = Sphere::new(Vec3::new(-0.2, 0.0, -1.0), 0.5, mirror.clone());
+    let s3 = Sphere::new(Vec3::new(1.0, 0.3, -0.6), 0.3, mirror.clone());
+    let s4 = Sphere::new(Vec3::new(0.4, -0.3, -0.1), 0.1, mirror.clone());
 
     let mut objects: Vec<Box<dyn Hittable>> = Vec::new();
 
@@ -39,8 +39,8 @@ fn main() {
         aspect_ratio: pm.width as f32 / pm.height as f32,
     };
 
-    let aa_samples = 1024;
-    let max_depth = 2024;
+    let aa_samples = 32;
+    let max_depth = 64;
 
     for j in 0..pm.height {
         for i in 0..pm.width {
@@ -89,8 +89,8 @@ struct PixMap {
 impl Default for PixMap {
     fn default() -> Self {
         Self {
-            width: 3840,
-            height: 2160,
+            width: 720,
+            height: 480,
             pixels: Vec::new(),
         }
     }
