@@ -35,7 +35,9 @@ impl Scatter for Material {
                 let cos_theta = -unit_direction.dot(hit.normal).min(1.0);
                 let sin_theta = (1.0 - cos_theta * cos_theta).sqrt();
 
-                let ref_vec = match eta_ratio * sin_theta > 1.0 {
+                let ref_vec = match eta_ratio * sin_theta > 1.0
+                    || random::<f32>() < schlick(cos_theta, eta_ratio)
+                {
                     true => reflect(unit_direction, hit.normal),
                     false => refract(unit_direction, hit.normal, eta_ratio),
                 };
@@ -97,6 +99,11 @@ fn refract(uv: Vec3, normal: Vec3, eta_ratio: f32) -> Vec3 {
     let perpendicular = -(1.0 - parallel.length_squared()).sqrt() * normal;
 
     parallel + perpendicular
+}
+
+fn schlick(cosine: f32, ior: f32) -> f32 {
+    let r = ((1.0 - ior) / (1.0 + ior)).powi(2);
+    r + (1.0 - r) * (1.0 - cosine).powi(5)
 }
 
 pub struct Reflection {
