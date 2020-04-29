@@ -10,6 +10,7 @@ pub trait Scatter {
 
 #[derive(Clone)]
 pub enum Material {
+    Dielectric(f32),
     Metal(Vec3, f32),
     Lambertian(Vec3),
 }
@@ -23,6 +24,29 @@ impl Default for Material {
 impl Scatter for Material {
     fn scatter(&self, ray: &Ray, hit: &Hit) -> Option<Reflection> {
         match self {
+            Material::Dielectric(ior) => {
+                let eta_ratio = match hit.front_face {
+                    true => 1.0 / ior,
+                    false => *ior,
+                };
+
+                let unit_direction = ray.direction().normalize();
+
+                let cos_theta = -unit_direction.dot(hit.normal).min(1.0);
+                let sin_theta = (1.0 - cos_theta * cos_theta).sqrt();
+
+                let ref_vec = match eta_ratio * sin_theta > 1.0 {
+                    true => reflect(unit_direction, hit.normal),
+                    false => refract(unit_direction, hit.normal, eta_ratio),
+                };
+
+                let ref_out = Reflection {
+                    attenuation: Vec3::new(1.0, 1.0, 1.0),
+                    scatter: Ray::new(hit.point, ref_vec),
+                };
+
+                Some(ref_out)
+            }
             Material::Metal(albedo, blur) => {
                 let reflected = reflect(ray.direction().normalize(), hit.normal);
                 let fuzz = blur.max(0.0).min(1.0) * Sphere::unit().random_point_within();
@@ -64,6 +88,15 @@ fn random_point_lambertian() -> Vec3 {
 
 fn reflect(v: Vec3, normal: Vec3) -> Vec3 {
     v - 2.0 * v.dot(normal) * normal
+}
+
+fn refract(uv: Vec3, normal: Vec3, eta_ratio: f32) -> Vec3 {
+    let cos_theta = -uv.dot(normal);
+
+    let parallel = eta_ratio * (uv + cos_theta * normal);
+    let perpendicular = -(1.0 - parallel.length_squared()).sqrt() * normal;
+
+    parallel + perpendicular
 }
 
 pub struct Reflection {
