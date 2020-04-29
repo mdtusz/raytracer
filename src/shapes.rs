@@ -1,5 +1,3 @@
-use rand::random;
-
 use crate::materials::Material;
 use crate::matrix::Vec3;
 use crate::{Hit, Hittable, Ray};
