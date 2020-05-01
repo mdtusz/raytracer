@@ -1,7 +1,8 @@
 use std::fs::File;
 use std::io::Write;
 
-use rand::random;
+use rand::prelude::*;
+use ultraviolet::{Mat4, Rotor3, Vec3, Vec4};
 
 mod color;
 mod materials;
@@ -10,19 +11,24 @@ mod shapes;
 
 use color::Color;
 use materials::{Material, Scatter};
-use matrix::Vec3;
 use shapes::Sphere;
 
 fn main() {
     let mut pm = PixMap::default();
 
-    let pink = Material::Lambertian(Vec3::new(0.5, 1.0, 0.5));
+    let green = Material::Lambertian(Vec3::new(0.5, 1.0, 0.5));
+    let navy = Material::Lambertian(Vec3::new(0.2, 0.5, 0.8));
+    let red = Material::Lambertian(Vec3::new(0.8, 0.2, 0.4));
+    let green = Material::Lambertian(Vec3::new(0.2, 0.4, 0.2));
     let mirror = Material::Metal(Vec3::new(0.5, 0.5, 0.5), 0.0);
+    let glass = Material::Dielectric(1.55);
 
-    let s1 = Sphere::new(Vec3::new(0.0, -100.5, -1.0), 100.0, pink.clone());
-    let s2 = Sphere::new(Vec3::new(-0.2, 0.0, -1.0), 0.5, mirror.clone());
-    let s3 = Sphere::new(Vec3::new(1.0, 0.3, -0.6), 0.3, mirror.clone());
-    let s4 = Sphere::new(Vec3::new(0.4, -0.3, -0.1), 0.1, mirror.clone());
+    let s1 = Sphere::new(Vec3::new(0.0, -100.5, 0.0), 100.0, navy.clone());
+    let s2 = Sphere::new(Vec3::new(0.0, 0.0, -10.0), 0.5, mirror.clone());
+    let s3 = Sphere::new(Vec3::new(1.0, 0.1, 4.0), 0.4, red.clone());
+    let s4 = Sphere::new(Vec3::new(-0.4, 0.0, 0.0), 0.4, glass.clone());
+    let s5 = Sphere::new(Vec3::new(-0.4, 0.0, 0.0), -0.38, glass.clone());
+    let s6 = Sphere::new(Vec3::new(0.0, 0.0, 0.0), 0.2, green.clone());
 
     let mut objects: Vec<Box<dyn Hittable>> = Vec::new();
 
@@ -30,17 +36,22 @@ fn main() {
     objects.push(Box::new(s2));
     objects.push(Box::new(s3));
     objects.push(Box::new(s4));
+    objects.push(Box::new(s5));
+    objects.push(Box::new(s6));
 
     let world = World { objects };
 
-    let camera = Camera {
-        look_at: Vec3::new(0.2, 0.0, -1.0),
-        position: Vec3::new(0.0, 0.0, 2.0),
-        aspect_ratio: pm.width as f32 / pm.height as f32,
-    };
+    let camera = Camera::new(
+        Vec3::new(0.0, 1.0, 10.0),
+        Vec3::new(0.0, 0.0, 0.0),
+        pm.aspect_ratio(),
+        1.6 / 2.0,
+        (Vec3::new(0.0, 1.0, 10.0) - Vec3::new(0.0, 0.0, 0.0)).mag(),
+        0.1,
+    );
 
-    let aa_samples = 32;
-    let max_depth = 64;
+    let aa_samples = 512;
+    let max_depth = 8;
 
     for j in 0..pm.height {
         for i in 0..pm.width {
@@ -59,13 +70,7 @@ fn main() {
                 let u = sample_i / pm.width as f32 - 0.5;
                 let v = 1.0 - sample_j / pm.height as f32 - 0.5;
 
-                // Decreasing this value will zoom in the view.
-                // It is the "depth" of the rendering plane, so decreasing the
-                // value essentially pushes the screen further away and our field
-                // of view decreases as the frustum narrows.
-                let w = -1.0;
-
-                let ray = camera.get_ray(u, v, w);
+                let ray = camera.get_ray(u, v);
 
                 let sample = ray.trace(&world, max_depth);
                 samples.push(sample);
@@ -113,6 +118,10 @@ impl PixMap {
 
         Ok(())
     }
+
+    fn aspect_ratio(&self) -> f32 {
+        self.width as f32 / self.height as f32
+    }
 }
 
 pub struct Ray {
@@ -138,9 +147,9 @@ impl Ray {
     }
 
     pub fn color(&self) -> Vec3 {
-        let unit_dir = self.direction().normalize();
+        let unit_dir = self.direction().normalized();
 
-        let t = 0.5 * (unit_dir.y() + 1.0);
+        let t = 0.5 * (unit_dir.y + 1.0);
 
         let c = (1.0 - t) * Vec3::new(1.0, 1.0, 1.0) + t * Vec3::new(0.5, 0.8, 1.0);
 
@@ -232,13 +241,56 @@ impl Hittable for World {
 }
 
 struct Camera {
-    look_at: Vec3,
+    focus_distance: f32,
+    lens_radius: f32,
     position: Vec3,
-    aspect_ratio: f32,
+    rotation: Mat4,
+    scaling: Vec4,
+    w: f32,
 }
 
 impl Camera {
-    pub fn get_ray(&self, u: f32, v: f32, w: f32) -> Ray {
-        Ray::new(self.position, Vec3::new(u * self.aspect_ratio, v, w))
+    pub fn new(
+        position: Vec3,
+        look_at: Vec3,
+        aspect: f32,
+        fov: f32,
+        fd: f32,
+        aperture: f32,
+    ) -> Self {
+        let w = -1.0 / (fov / 2.0).tan();
+        let scaling = Vec4::new(aspect, 1.0, 1.0, 1.0);
+        let rot = Mat4::look_at(position, look_at, Vec3::new(0.0, 1.0, 0.0));
+
+        Self {
+            focus_distance: fd,
+            lens_radius: aperture / 2.0,
+            position: position,
+            rotation: rot.inversed(),
+            scaling: scaling,
+            w: w,
+        }
+    }
+
+    pub fn get_ray(&self, u: f32, v: f32) -> Ray {
+        let uvw = Vec4::new(u, v, self.w, 0.0) * self.focus_distance / 2.0 * self.scaling;
+        let rd = self.rotation * uvw;
+
+        let dof_offset = random_in_unit_disk() * self.lens_radius;
+        // let offset = self.rotation[0] * dof_offset.x + self.rotation[1] * dof_offset.y;
+        let offset = self.rotation * Vec4::new(dof_offset.x, dof_offset.y, dof_offset.z, 0.0);
+
+        Ray::new(self.position + offset.xyz(), rd.xyz() - offset.xyz())
+    }
+}
+
+fn random_in_unit_disk() -> Vec3 {
+    let mut rng = thread_rng();
+    loop {
+        let p = Vec3::new(rng.gen_range(-1.0, 1.0), rng.gen_range(-1.0, 1.0), 0.0);
+
+        if p.mag() < 1.0 {
+            return p;
+        }
     }
 }

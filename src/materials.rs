@@ -1,6 +1,6 @@
 use rand::random;
+use ultraviolet::Vec3;
 
-use crate::matrix::Vec3;
 use crate::shapes::Sphere;
 use crate::{Hit, Ray};
 
@@ -30,7 +30,7 @@ impl Scatter for Material {
                     false => *ior,
                 };
 
-                let unit_direction = ray.direction().normalize();
+                let unit_direction = ray.direction().normalized();
 
                 let cos_theta = -unit_direction.dot(hit.normal).min(1.0);
                 let sin_theta = (1.0 - cos_theta * cos_theta).sqrt();
@@ -50,7 +50,7 @@ impl Scatter for Material {
                 Some(ref_out)
             }
             Material::Metal(albedo, blur) => {
-                let reflected = reflect(ray.direction().normalize(), hit.normal);
+                let reflected = reflect(ray.direction().normalized(), hit.normal);
                 let fuzz = blur.max(0.0).min(1.0) * Sphere::unit().random_point_within();
                 let scatter = Ray::new(hit.point, reflected + fuzz);
 
@@ -96,7 +96,7 @@ fn refract(uv: Vec3, normal: Vec3, eta_ratio: f32) -> Vec3 {
     let cos_theta = -uv.dot(normal);
 
     let parallel = eta_ratio * (uv + cos_theta * normal);
-    let perpendicular = -(1.0 - parallel.length_squared()).sqrt() * normal;
+    let perpendicular = -(1.0 - parallel.mag_sq()).sqrt() * normal;
 
     parallel + perpendicular
 }

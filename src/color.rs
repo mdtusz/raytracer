@@ -1,4 +1,4 @@
-use crate::matrix::Vec3;
+use ultraviolet::Vec3;
 
 pub struct Color(u8, u8, u8);
 
@@ -8,12 +8,12 @@ impl Color {
     }
 
     pub fn from_samples(samples: Vec<Vec3>) -> Self {
-        let summed: Vec3 = samples.iter().sum();
+        let summed: Vec3 = samples.iter().fold(Vec3::zero(), |acc, s| *s + acc);
         let scale = 1.0 / samples.len() as f32;
 
-        let r = (summed.x() * scale).sqrt().max(0.0).min(1.0);
-        let g = (summed.y() * scale).sqrt().max(0.0).min(1.0);
-        let b = (summed.z() * scale).sqrt().max(0.0).min(1.0);
+        let r = (summed.x * scale).sqrt().max(0.0).min(1.0);
+        let g = (summed.y * scale).sqrt().max(0.0).min(1.0);
+        let b = (summed.z * scale).sqrt().max(0.0).min(1.0);
 
         Vec3::new(r, g, b).into()
     }
@@ -36,9 +36,9 @@ impl Into<Color> for Vec3 {
         let bit_depth = 255.999;
 
         Color(
-            (self.x() * bit_depth) as u8,
-            (self.y() * bit_depth) as u8,
-            (self.z() * bit_depth) as u8,
+            (self.x * bit_depth) as u8,
+            (self.y * bit_depth) as u8,
+            (self.z * bit_depth) as u8,
         )
     }
 }

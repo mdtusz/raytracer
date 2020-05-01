@@ -1,5 +1,8 @@
+use rand::random;
+use ultraviolet::Vec3;
+
 use crate::materials::Material;
-use crate::matrix::Vec3;
+// use crate::matrix::Vec3;
 use crate::{Hit, Hittable, Ray};
 
 pub struct Sphere {
@@ -22,7 +25,7 @@ impl Sphere {
     }
 
     pub fn random_point_within(&self) -> Vec3 {
-        let p = Vec3::random();
+        let p = Vec3::new(random(), random(), random());
 
         if self.contains(p) {
             p
@@ -32,7 +35,7 @@ impl Sphere {
     }
 
     fn contains(&self, point: Vec3) -> bool {
-        (point - self.center).length_squared() < self.radius
+        (point - self.center).mag_sq() < self.radius
     }
 }
 
@@ -42,7 +45,7 @@ impl Hittable for Sphere {
 
         let a = ray.direction().dot(ray.direction());
         let half_b = oc.dot(ray.direction());
-        let c = oc.length_squared() - self.radius * self.radius;
+        let c = oc.mag_sq() - self.radius * self.radius;
 
         let discriminant = half_b * half_b - a * c;
 
