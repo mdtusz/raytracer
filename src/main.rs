@@ -2,7 +2,8 @@ use std::fs::File;
 use std::io::Write;
 
 use rand::prelude::*;
-use ultraviolet::{Mat4, Rotor3, Vec3, Vec4};
+use rayon::prelude::*;
+use ultraviolet::{Mat4, Vec3, Vec4};
 
 mod color;
 mod materials;
@@ -16,7 +17,6 @@ use shapes::Sphere;
 fn main() {
     let mut pm = PixMap::default();
 
-    let green = Material::Lambertian(Vec3::new(0.5, 1.0, 0.5));
     let navy = Material::Lambertian(Vec3::new(0.2, 0.5, 0.8));
     let red = Material::Lambertian(Vec3::new(0.8, 0.2, 0.4));
     let green = Material::Lambertian(Vec3::new(0.2, 0.4, 0.2));
@@ -30,7 +30,7 @@ fn main() {
     let s5 = Sphere::new(Vec3::new(-0.4, 0.0, 0.0), -0.38, glass.clone());
     let s6 = Sphere::new(Vec3::new(0.0, 0.0, 0.0), 0.2, green.clone());
 
-    let mut objects: Vec<Box<dyn Hittable>> = Vec::new();
+    let mut objects: Vec<Box<dyn Hittable + Send + Sync>> = Vec::new();
 
     objects.push(Box::new(s1));
     objects.push(Box::new(s2));
@@ -53,13 +53,21 @@ fn main() {
     let aa_samples = 512;
     let max_depth = 8;
 
+    let mut pixels = Vec::new();
     for j in 0..pm.height {
         for i in 0..pm.width {
+            pixels.push((i, j));
+        }
+    }
+
+    pm.pixels = pixels
+        .par_iter()
+        .map(|(i, j)| {
             let mut samples = Vec::new();
 
             for s in 0..aa_samples {
-                let mut sample_i = i as f32;
-                let mut sample_j = j as f32;
+                let mut sample_i = *i as f32;
+                let mut sample_j = *j as f32;
 
                 if s > 0 {
                     sample_i += random::<f32>() - 0.5;
@@ -76,11 +84,9 @@ fn main() {
                 samples.push(sample);
             }
 
-            let color = Color::from_samples(samples);
-
-            pm.pixels.push(color);
-        }
-    }
+            Color::from_samples(samples)
+        })
+        .collect();
 
     pm.save().unwrap();
 }
@@ -224,7 +230,7 @@ impl Hit {
 }
 
 pub struct World {
-    objects: Vec<Box<dyn Hittable>>,
+    objects: Vec<Box<dyn Hittable + Send + Sync>>,
 }
 
 impl Hittable for World {

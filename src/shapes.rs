@@ -5,6 +5,7 @@ use crate::materials::Material;
 // use crate::matrix::Vec3;
 use crate::{Hit, Hittable, Ray};
 
+#[derive(Clone)]
 pub struct Sphere {
     pub center: Vec3,
     pub radius: f32,
