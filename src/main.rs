@@ -1,6 +1,10 @@
 use std::fs::File;
 use std::io::Write;
+use std::sync::mpsc;
+use std::thread;
+use std::time::Instant;
 
+use minifb::{ScaleMode, Window, WindowOptions};
 use rand::prelude::*;
 use rayon::prelude::*;
 use ultraviolet::{Mat4, Vec3, Vec4};
@@ -15,8 +19,6 @@ use materials::{Material, Scatter};
 use shapes::Sphere;
 
 fn main() {
-    let mut pm = PixMap::default();
-
     let navy = Material::Lambertian(Vec3::new(0.2, 0.5, 0.8));
     let red = Material::Lambertian(Vec3::new(0.8, 0.2, 0.4));
     let green = Material::Lambertian(Vec3::new(0.2, 0.4, 0.2));
@@ -27,8 +29,8 @@ fn main() {
     let s2 = Sphere::new(Vec3::new(0.0, 0.0, -10.0), 0.5, mirror.clone());
     let s3 = Sphere::new(Vec3::new(1.0, 0.1, 4.0), 0.4, red.clone());
     let s4 = Sphere::new(Vec3::new(-0.4, 0.0, 0.0), 0.4, glass.clone());
-    let s5 = Sphere::new(Vec3::new(-0.4, 0.0, 0.0), -0.38, glass.clone());
-    let s6 = Sphere::new(Vec3::new(0.0, 0.0, 0.0), 0.2, green.clone());
+    let s5 = Sphere::new(Vec3::new(-0.4, 0.0, 0.0), -0.35, glass.clone());
+    let s6 = Sphere::new(Vec3::new(-1.0, 0.0, 3.0), 0.2, green.clone());
 
     let mut objects: Vec<Box<dyn Hittable + Send + Sync>> = Vec::new();
 
@@ -39,6 +41,13 @@ fn main() {
     objects.push(Box::new(s5));
     objects.push(Box::new(s6));
 
+    let aa_samples = 128;
+    let max_depth = 512;
+    let width = 1920;
+    let height = 1080;
+
+    let mut pm = PixMap::new(width, height);
+
     let world = World { objects };
 
     let camera = Camera::new(
@@ -47,11 +56,17 @@ fn main() {
         pm.aspect_ratio(),
         1.6 / 2.0,
         (Vec3::new(0.0, 1.0, 10.0) - Vec3::new(0.0, 0.0, 0.0)).mag(),
-        0.1,
+        0.0,
     );
 
-    let aa_samples = 512;
-    let max_depth = 8;
+    let mut options = WindowOptions::default();
+    options.resize = true;
+    options.scale_mode = ScaleMode::Center;
+
+    let mut window =
+        Window::new("Raytracer", pm.width as usize, pm.height as usize, options).unwrap();
+
+    window.limit_update_rate(Some(std::time::Duration::from_millis(16)));
 
     let mut pixels = Vec::new();
     for j in 0..pm.height {
@@ -60,14 +75,15 @@ fn main() {
         }
     }
 
-    pm.pixels = pixels
-        .par_iter()
-        .map(|(i, j)| {
+    let (tx, rx) = mpsc::channel();
+
+    thread::spawn(move || {
+        pixels.into_par_iter().for_each_with(tx, |tx, (x, y)| {
             let mut samples = Vec::new();
 
             for s in 0..aa_samples {
-                let mut sample_i = *i as f32;
-                let mut sample_j = *j as f32;
+                let mut sample_i = x as f32;
+                let mut sample_j = y as f32;
 
                 if s > 0 {
                     sample_i += random::<f32>() - 0.5;
@@ -75,8 +91,8 @@ fn main() {
                 }
 
                 // UV coordinates are on a cartesian plane from -1 to 1.
-                let u = sample_i / pm.width as f32 - 0.5;
-                let v = 1.0 - sample_j / pm.height as f32 - 0.5;
+                let u = sample_i / width as f32 - 0.5;
+                let v = 1.0 - sample_j / height as f32 - 0.5;
 
                 let ray = camera.get_ray(u, v);
 
@@ -84,30 +100,57 @@ fn main() {
                 samples.push(sample);
             }
 
-            Color::from_samples(samples)
-        })
-        .collect();
+            let c = Color::from_samples(samples);
+
+            tx.send((x, y, c)).expect("wtf");
+        });
+    });
+
+    let mut now = Instant::now();
+    while let Ok((x, y, c)) = rx.recv() {
+        pm.update(x, y, c);
+
+        if now.elapsed().as_millis() >= 16 {
+            now = Instant::now();
+            window
+                .update_with_buffer(&pm.to_hex(), pm.width as usize, pm.height as usize)
+                .unwrap();
+        }
+    }
+
+    window
+        .update_with_buffer(&pm.to_hex(), pm.width as usize, pm.height as usize)
+        .unwrap();
 
     pm.save().unwrap();
+    println!("Done.");
+
+    while window.is_open() {}
 }
 
 struct PixMap {
     pixels: Vec<Color>,
-    width: u16,
-    height: u16,
+    width: u32,
+    height: u32,
 }
 
 impl Default for PixMap {
     fn default() -> Self {
-        Self {
-            width: 720,
-            height: 480,
-            pixels: Vec::new(),
-        }
+        Self::new(720, 480)
     }
 }
 
 impl PixMap {
+    fn new(width: u32, height: u32) -> Self {
+        let pixel_count = width * height;
+
+        Self {
+            width: width,
+            height: height,
+            pixels: vec![Color::black(); pixel_count as usize],
+        }
+    }
+
     fn save(&self) -> std::io::Result<()> {
         let mut file = File::create("test.ppm")?;
         let mut v: Vec<u8> = Vec::new();
@@ -125,8 +168,17 @@ impl PixMap {
         Ok(())
     }
 
+    fn update(&mut self, x: u32, y: u32, color: Color) {
+        let i = x + y * self.width;
+        self.pixels[i as usize] = color;
+    }
+
     fn aspect_ratio(&self) -> f32 {
         self.width as f32 / self.height as f32
+    }
+
+    fn to_hex(&self) -> Vec<u32> {
+        self.pixels.iter().map(|c| c.hex()).collect::<Vec<u32>>()
     }
 }
 
@@ -167,7 +219,7 @@ impl Ray {
             return Vec3::default();
         }
 
-        match world.hit(&self, 0.0001, f32::INFINITY) {
+        match world.hit(&self, 0.001, f32::INFINITY) {
             Some(hit) => {
                 // let target = hit.point + random_point_hemisphere(hit.normal);
                 // let ray = Ray::new(hit.point, target - hit.point);

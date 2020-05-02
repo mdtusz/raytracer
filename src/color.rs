@@ -1,5 +1,6 @@
 use ultraviolet::Vec3;
 
+#[derive(Clone, Debug)]
 pub struct Color(u8, u8, u8);
 
 impl Color {
@@ -28,6 +29,15 @@ impl Color {
 
     pub fn b(&self) -> u8 {
         self.2
+    }
+
+    pub fn hex(&self) -> u32 {
+        let (r, g, b) = (self.r() as u32, self.g() as u32, self.b() as u32);
+        (r << 16) | (g << 8) | b
+    }
+
+    pub fn black() -> Self {
+        Self(0, 0, 0)
     }
 }
 
