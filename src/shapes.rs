@@ -42,7 +42,7 @@ impl Sphere {
 
 impl Hittable for Sphere {
     fn hit(&self, ray: &Ray, min: f32, max: f32) -> Option<Hit> {
-        let oc = ray.origin - self.center;
+        let oc = ray.origin() - self.center;
 
         let a = ray.direction().dot(ray.direction());
         let half_b = oc.dot(ray.direction());

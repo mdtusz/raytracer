@@ -1,5 +1,3 @@
-use std::fs::File;
-use std::io::Write;
 use std::sync::mpsc;
 use std::thread;
 use std::time::Instant;
@@ -7,56 +5,66 @@ use std::time::Instant;
 use minifb::{Key, ScaleMode, Window, WindowOptions};
 use rand::{prelude::*, seq::SliceRandom};
 use rayon::prelude::*;
-use ultraviolet::{Mat4, Vec3, Vec4};
+use ultraviolet::Vec3;
 
+mod camera;
 mod color;
 mod materials;
 mod matrix;
+mod pixmap;
+mod ray;
 mod shapes;
+mod world;
 
+use camera::Camera;
 use color::Color;
-use materials::{Material, Scatter};
+use materials::Material;
+use pixmap::PixMap;
+use ray::Ray;
 use shapes::Sphere;
+use world::World;
 
 fn main() {
-    let navy = Material::Lambertian(Vec3::new(0.2, 0.5, 0.8));
-    let red = Material::Lambertian(Vec3::new(0.8, 0.2, 0.4));
-    let green = Material::Lambertian(Vec3::new(0.2, 0.4, 0.2));
-    let mirror = Material::Metal(Vec3::new(0.5, 0.5, 0.5), 0.0);
-    let glass = Material::Dielectric(1.55);
-
-    let s1 = Sphere::new(Vec3::new(0.0, -100.5, 0.0), 100.0, navy.clone());
-    let s2 = Sphere::new(Vec3::new(0.0, 0.0, -10.0), 0.5, mirror.clone());
-    let s3 = Sphere::new(Vec3::new(1.0, 0.1, 4.0), 0.4, red.clone());
-    let s4 = Sphere::new(Vec3::new(-5.0, 0.0, 0.0), 0.4, glass.clone());
-    let s5 = Sphere::new(Vec3::new(-0.4, 0.0, 0.0), -0.35, glass.clone());
-    let s6 = Sphere::new(Vec3::new(0.0, 0.0, 0.0), 0.2, green.clone());
-
-    let mut objects: Vec<Box<dyn Hittable + Send + Sync>> = Vec::new();
-
-    objects.push(Box::new(s1));
-    objects.push(Box::new(s2));
-    objects.push(Box::new(s3));
-    objects.push(Box::new(s4));
-    objects.push(Box::new(s5));
-    objects.push(Box::new(s6));
-
-    let aa_samples = 3;
-    let max_depth = 128;
+    let aa_samples = 1024;
+    let max_depth = 4096;
     let width = 1920;
     let height = 1080;
 
     let mut pm = PixMap::new(width, height);
 
-    let world = World { objects };
+    let navy = Material::Lambertian(Vec3::new(0.2, 0.5, 0.8));
+    let red = Material::Lambertian(Vec3::new(0.8, 0.2, 0.4));
+    let green = Material::Lambertian(Vec3::new(0.2, 0.3, 0.22));
+    let mirror = Material::Metal(Vec3::new(0.5, 0.5, 0.5), 0.0);
+    let blur_mirror = Material::Metal(Vec3::new(0.21, 0.2, 0.2), 0.3);
+    let glass = Material::Dielectric(Vec3::new(1.0, 1.0, 1.0), 1.55);
+    let amber = Material::Dielectric(Vec3::new(1.0, 0.8, 0.78), 1.31);
+
+    let s1 = Sphere::new(Vec3::new(0.0, -100.5, 0.0), 100.0, blur_mirror.clone());
+    let s2 = Sphere::new(Vec3::new(0.0, 0.0, -10.0), 1.0, mirror.clone());
+    let s3 = Sphere::new(Vec3::new(1.0, 0.2, 2.0), 0.4, red.clone());
+    let s4 = Sphere::new(Vec3::new(-2.0, 0.5, 0.0), 0.7, glass.clone());
+    let s5 = Sphere::new(Vec3::new(-2.0, 0.5, 0.0), -0.6, glass.clone());
+    let s6 = Sphere::new(Vec3::new(-2.0, 0.5, 0.0), 0.45, amber.clone());
+    let s7 = Sphere::new(Vec3::new(-0.9, 1.1, -7.0), 0.4, green.clone());
+
+    let mut world = World::new();
+    world
+        .add_object(Box::new(s1))
+        .add_object(Box::new(s2))
+        .add_object(Box::new(s3))
+        .add_object(Box::new(s4))
+        .add_object(Box::new(s5))
+        .add_object(Box::new(s6))
+        .add_object(Box::new(s7));
 
     let camera = Camera::new(
         Vec3::new(0.0, 2.0, 10.0),
-        Vec3::new(0.0, 0.0, -10.0),
+        Vec3::new(0.0, 1.0, 0.0),
         pm.aspect_ratio(),
         2.0 / 2.0,
-        (Vec3::new(0.0, 2.0, 10.0) - Vec3::new(0.0, 0.0, -10.0)).mag(),
-        0.5,
+        10.0,
+        0.05,
     );
 
     let mut options = WindowOptions::default();
@@ -129,110 +137,7 @@ fn main() {
     }
 }
 
-struct PixMap {
-    pixels: Vec<Color>,
-    width: u32,
-    height: u32,
-}
-
-impl Default for PixMap {
-    fn default() -> Self {
-        Self::new(720, 480)
-    }
-}
-
-impl PixMap {
-    fn new(width: u32, height: u32) -> Self {
-        let pixel_count = width * height;
-
-        Self {
-            width,
-            height,
-            pixels: vec![Color::black(); pixel_count as usize],
-        }
-    }
-
-    fn save(&self) -> std::io::Result<()> {
-        let mut file = File::create("test.ppm")?;
-        let mut v: Vec<u8> = Vec::new();
-
-        let header = format!("P3\n{} {}\n255\n", self.width, self.height);
-        v.extend(header.as_bytes());
-
-        for color in &self.pixels {
-            let color_string = format!("{}\n", color);
-            v.extend(color_string.as_bytes());
-        }
-
-        file.write_all(&v)?;
-
-        Ok(())
-    }
-
-    fn update(&mut self, x: u32, y: u32, color: Color) {
-        let i = x + y * self.width;
-        self.pixels[i as usize] = color;
-    }
-
-    fn aspect_ratio(&self) -> f32 {
-        self.width as f32 / self.height as f32
-    }
-
-    fn to_hex(&self) -> Vec<u32> {
-        self.pixels.iter().map(|c| c.hex()).collect::<Vec<u32>>()
-    }
-}
-
-pub struct Ray {
-    origin: Vec3,
-    vec: Vec3,
-}
-
-impl Ray {
-    pub fn new(origin: Vec3, vec: Vec3) -> Self {
-        Ray { origin, vec }
-    }
-
-    pub fn origin(&self) -> Vec3 {
-        self.origin
-    }
-
-    pub fn direction(&self) -> Vec3 {
-        self.vec
-    }
-
-    pub fn at(&self, t: f32) -> Vec3 {
-        self.origin + self.vec * t
-    }
-
-    pub fn color(&self) -> Vec3 {
-        let unit_dir = self.direction().normalized();
-
-        let t = 0.5 * (unit_dir.y + 1.0);
-
-        let c = (1.0 - t) * Vec3::new(1.0, 1.0, 1.0) + t * Vec3::new(0.5, 0.8, 1.0);
-
-        c
-    }
-
-    pub fn trace(&self, world: &World, depth: u32) -> Vec3 {
-        if depth <= 0 {
-            return Vec3::default();
-        }
-
-        match world.hit(&self, 0.001, f32::INFINITY) {
-            Some(hit) => match hit.material.scatter(&self, &hit) {
-                Some(reflection) => {
-                    reflection.attenuation * reflection.scatter.trace(world, depth - 1)
-                }
-                None => Vec3::default(),
-            },
-            None => self.color(),
-        }
-    }
-}
-
-trait Hittable {
+pub trait Hittable {
     fn hit(&self, ray: &Ray, min: f32, max: f32) -> Option<Hit>;
 }
 
@@ -262,77 +167,6 @@ impl Hit {
         } else {
             self.front_face = false;
             self.normal = -outward_normal;
-        }
-    }
-}
-
-pub struct World {
-    objects: Vec<Box<dyn Hittable + Send + Sync>>,
-}
-
-impl Hittable for World {
-    fn hit(&self, ray: &Ray, min: f32, max: f32) -> Option<Hit> {
-        let (_closest, hit) = self.objects.iter().fold((max, None), |acc, object| {
-            match object.hit(ray, min, acc.0) {
-                Some(hit) => (hit.t, Some(hit)),
-                None => acc,
-            }
-        });
-
-        Some(hit).flatten()
-    }
-}
-
-struct Camera {
-    focus_distance: f32,
-    lens_radius: f32,
-    position: Vec3,
-    rotation: Mat4,
-    scaling: Vec4,
-    w: f32,
-}
-
-impl Camera {
-    pub fn new(
-        position: Vec3,
-        look_at: Vec3,
-        aspect: f32,
-        fov: f32,
-        focus_distance: f32,
-        aperture: f32,
-    ) -> Self {
-        let w = -1.0 / (fov / 2.0).tan();
-        let scaling = Vec4::new(aspect, 1.0, 1.0, 1.0);
-        let rot = Mat4::look_at(position, look_at, Vec3::new(0.0, 1.0, 0.0));
-
-        Self {
-            focus_distance,
-            lens_radius: aperture / 2.0,
-            position,
-            rotation: rot.inversed(),
-            scaling,
-            w,
-        }
-    }
-
-    pub fn get_ray(&self, u: f32, v: f32) -> Ray {
-        let uvw = (Vec4::new(u, v, self.w, 0.0) * self.scaling).normalized() * self.focus_distance;
-        let rd = self.rotation * uvw;
-
-        let dof_offset = random_in_unit_disk() * self.lens_radius;
-        let offset = self.rotation * Vec4::new(dof_offset.x, dof_offset.y, 0.0, 0.0);
-
-        Ray::new(self.position + offset.xyz(), rd.xyz() - offset.xyz())
-    }
-}
-
-fn random_in_unit_disk() -> Vec3 {
-    let mut rng = thread_rng();
-    loop {
-        let p = Vec3::new(rng.gen_range(-1.0, 1.0), rng.gen_range(-1.0, 1.0), 0.0);
-
-        if p.mag() < 1.0 {
-            return p;
         }
     }
 }

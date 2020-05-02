@@ -10,7 +10,7 @@ pub trait Scatter {
 
 #[derive(Clone)]
 pub enum Material {
-    Dielectric(f32),
+    Dielectric(Vec3, f32),
     Metal(Vec3, f32),
     Lambertian(Vec3),
 }
@@ -24,7 +24,7 @@ impl Default for Material {
 impl Scatter for Material {
     fn scatter(&self, ray: &Ray, hit: &Hit) -> Option<Reflection> {
         match self {
-            Material::Dielectric(ior) => {
+            Material::Dielectric(albedo, ior) => {
                 let eta_ratio = match hit.front_face {
                     true => 1.0 / ior,
                     false => *ior,
@@ -43,7 +43,7 @@ impl Scatter for Material {
                 };
 
                 let ref_out = Reflection {
-                    attenuation: Vec3::new(1.0, 1.0, 1.0),
+                    attenuation: *albedo,
                     scatter: Ray::new(hit.point, ref_vec),
                 };
 
