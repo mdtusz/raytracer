@@ -4,8 +4,8 @@ use std::sync::mpsc;
 use std::thread;
 use std::time::Instant;
 
-use minifb::{ScaleMode, Window, WindowOptions};
-use rand::prelude::*;
+use minifb::{Key, ScaleMode, Window, WindowOptions};
+use rand::{prelude::*, seq::SliceRandom};
 use rayon::prelude::*;
 use ultraviolet::{Mat4, Vec3, Vec4};
 
@@ -28,9 +28,9 @@ fn main() {
     let s1 = Sphere::new(Vec3::new(0.0, -100.5, 0.0), 100.0, navy.clone());
     let s2 = Sphere::new(Vec3::new(0.0, 0.0, -10.0), 0.5, mirror.clone());
     let s3 = Sphere::new(Vec3::new(1.0, 0.1, 4.0), 0.4, red.clone());
-    let s4 = Sphere::new(Vec3::new(-0.4, 0.0, 0.0), 0.4, glass.clone());
+    let s4 = Sphere::new(Vec3::new(-5.0, 0.0, 0.0), 0.4, glass.clone());
     let s5 = Sphere::new(Vec3::new(-0.4, 0.0, 0.0), -0.35, glass.clone());
-    let s6 = Sphere::new(Vec3::new(-1.0, 0.0, 3.0), 0.2, green.clone());
+    let s6 = Sphere::new(Vec3::new(0.0, 0.0, 0.0), 0.2, green.clone());
 
     let mut objects: Vec<Box<dyn Hittable + Send + Sync>> = Vec::new();
 
@@ -41,8 +41,8 @@ fn main() {
     objects.push(Box::new(s5));
     objects.push(Box::new(s6));
 
-    let aa_samples = 128;
-    let max_depth = 512;
+    let aa_samples = 3;
+    let max_depth = 128;
     let width = 1920;
     let height = 1080;
 
@@ -51,12 +51,12 @@ fn main() {
     let world = World { objects };
 
     let camera = Camera::new(
-        Vec3::new(0.0, 1.0, 10.0),
-        Vec3::new(0.0, 0.0, 0.0),
+        Vec3::new(0.0, 2.0, 10.0),
+        Vec3::new(0.0, 0.0, -10.0),
         pm.aspect_ratio(),
-        1.6 / 2.0,
-        (Vec3::new(0.0, 1.0, 10.0) - Vec3::new(0.0, 0.0, 0.0)).mag(),
-        0.0,
+        2.0 / 2.0,
+        (Vec3::new(0.0, 2.0, 10.0) - Vec3::new(0.0, 0.0, -10.0)).mag(),
+        0.5,
     );
 
     let mut options = WindowOptions::default();
@@ -65,7 +65,6 @@ fn main() {
 
     let mut window =
         Window::new("Raytracer", pm.width as usize, pm.height as usize, options).unwrap();
-
     window.limit_update_rate(Some(std::time::Duration::from_millis(16)));
 
     let mut pixels = Vec::new();
@@ -74,6 +73,7 @@ fn main() {
             pixels.push((i, j));
         }
     }
+    pixels.shuffle(&mut thread_rng());
 
     let (tx, rx) = mpsc::channel();
 
@@ -118,14 +118,15 @@ fn main() {
         }
     }
 
-    window
-        .update_with_buffer(&pm.to_hex(), pm.width as usize, pm.height as usize)
-        .unwrap();
-
     pm.save().unwrap();
     println!("Done.");
 
-    while window.is_open() {}
+    while window.is_open() && !window.is_key_down(Key::Escape) {
+        window.update();
+        window
+            .update_with_buffer(&pm.to_hex(), pm.width as usize, pm.height as usize)
+            .unwrap();
+    }
 }
 
 struct PixMap {
@@ -145,8 +146,8 @@ impl PixMap {
         let pixel_count = width * height;
 
         Self {
-            width: width,
-            height: height,
+            width,
+            height,
             pixels: vec![Color::black(); pixel_count as usize],
         }
     }
@@ -220,30 +221,14 @@ impl Ray {
         }
 
         match world.hit(&self, 0.001, f32::INFINITY) {
-            Some(hit) => {
-                // let target = hit.point + random_point_hemisphere(hit.normal);
-                // let ray = Ray::new(hit.point, target - hit.point);
-                // 0.5 * ray.trace(world, depth - 1)
-                match hit.material.scatter(&self, &hit) {
-                    Some(reflection) => {
-                        reflection.attenuation * reflection.scatter.trace(world, depth - 1)
-                    }
-                    None => Vec3::default(),
+            Some(hit) => match hit.material.scatter(&self, &hit) {
+                Some(reflection) => {
+                    reflection.attenuation * reflection.scatter.trace(world, depth - 1)
                 }
-            }
+                None => Vec3::default(),
+            },
             None => self.color(),
         }
-    }
-}
-
-// Diffuse
-fn random_point_hemisphere(normal: Vec3) -> Vec3 {
-    let p = Sphere::unit().random_point_within();
-
-    if p.dot(normal) > 0.0 {
-        p
-    } else {
-        -p
     }
 }
 
@@ -313,7 +298,7 @@ impl Camera {
         look_at: Vec3,
         aspect: f32,
         fov: f32,
-        fd: f32,
+        focus_distance: f32,
         aperture: f32,
     ) -> Self {
         let w = -1.0 / (fov / 2.0).tan();
@@ -321,22 +306,21 @@ impl Camera {
         let rot = Mat4::look_at(position, look_at, Vec3::new(0.0, 1.0, 0.0));
 
         Self {
-            focus_distance: fd,
+            focus_distance,
             lens_radius: aperture / 2.0,
-            position: position,
+            position,
             rotation: rot.inversed(),
-            scaling: scaling,
-            w: w,
+            scaling,
+            w,
         }
     }
 
     pub fn get_ray(&self, u: f32, v: f32) -> Ray {
-        let uvw = Vec4::new(u, v, self.w, 0.0) * self.focus_distance / 2.0 * self.scaling;
+        let uvw = (Vec4::new(u, v, self.w, 0.0) * self.scaling).normalized() * self.focus_distance;
         let rd = self.rotation * uvw;
 
         let dof_offset = random_in_unit_disk() * self.lens_radius;
-        // let offset = self.rotation[0] * dof_offset.x + self.rotation[1] * dof_offset.y;
-        let offset = self.rotation * Vec4::new(dof_offset.x, dof_offset.y, dof_offset.z, 0.0);
+        let offset = self.rotation * Vec4::new(dof_offset.x, dof_offset.y, 0.0, 0.0);
 
         Ray::new(self.position + offset.xyz(), rd.xyz() - offset.xyz())
     }
