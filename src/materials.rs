@@ -44,7 +44,7 @@ impl Scatter for Material {
 
                 let ref_out = Reflection {
                     attenuation: *albedo,
-                    scatter: Ray::new(hit.point, ref_vec),
+                    scatter: Ray::new(hit.point, ref_vec, ray.time()),
                 };
 
                 Some(ref_out)
@@ -52,12 +52,12 @@ impl Scatter for Material {
             Material::Metal(albedo, blur) => {
                 let reflected = reflect(ray.direction().normalized(), hit.normal);
                 let fuzz = blur.max(0.0).min(1.0) * Sphere::unit().random_point_within();
-                let scatter = Ray::new(hit.point, reflected + fuzz);
+                let scatter = Ray::new(hit.point, reflected + fuzz, ray.time());
 
                 if scatter.direction().dot(hit.normal) > 0.0 {
                     let reflection = Reflection {
                         attenuation: *albedo,
-                        scatter: scatter,
+                        scatter,
                     };
 
                     Some(reflection)
@@ -70,7 +70,7 @@ impl Scatter for Material {
 
                 let reflection = Reflection {
                     attenuation: *albedo,
-                    scatter: Ray::new(hit.point, scatter_direction),
+                    scatter: Ray::new(hit.point, scatter_direction, ray.time()),
                 };
 
                 Some(reflection)

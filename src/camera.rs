@@ -11,6 +11,8 @@ pub struct Camera {
     rotation: Mat4,
     scaling: Vec4,
     w: f32,
+    open: f32,
+    close: f32,
 }
 
 impl Camera {
@@ -21,6 +23,8 @@ impl Camera {
         fov: f32,
         focus_distance: f32,
         aperture: f32,
+        open: f32,
+        close: f32,
     ) -> Self {
         let w = -1.0 / (fov / 2.0).tan();
         let scaling = Vec4::new(aspect, 1.0, 1.0, 1.0);
@@ -33,6 +37,8 @@ impl Camera {
             rotation: rot.inversed(),
             scaling,
             w,
+            open,
+            close,
         }
     }
 
@@ -43,7 +49,8 @@ impl Camera {
         let dof_offset = random_in_unit_disk() * self.lens_radius;
         let offset = self.rotation * Vec4::new(dof_offset.x, dof_offset.y, 0.0, 0.0);
 
-        Ray::new(self.position + offset.xyz(), rd.xyz() - offset.xyz())
+        let time = thread_rng().gen_range(self.open, self.close);
+        Ray::new(self.position + offset.xyz(), rd.xyz() - offset.xyz(), time)
     }
 }
 

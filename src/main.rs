@@ -25,8 +25,8 @@ use shapes::Sphere;
 use world::World;
 
 fn main() {
-    let aa_samples = 1024;
-    let max_depth = 4096;
+    let aa_samples = 2;
+    let max_depth = 8;
     let width = 1920;
     let height = 1080;
 
@@ -65,6 +65,8 @@ fn main() {
         2.0 / 2.0,
         10.0,
         0.05,
+        0.0,
+        1.0,
     );
 
     let mut options = WindowOptions::default();
