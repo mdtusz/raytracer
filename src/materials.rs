@@ -1,8 +1,33 @@
 use rand::random;
 use ultraviolet::Vec3;
 
+use crate::color::Color;
 use crate::shapes::Sphere;
 use crate::{Hit, Ray};
+
+#[derive(Clone)]
+pub enum Texture {
+    Solid(Color),
+}
+
+impl Texture {
+    pub fn value(&self) -> Vec3 {
+        match self {
+            Self::Solid(c) => c.into(),
+        }
+    }
+
+    pub fn solid(r: u8, g: u8, b: u8) -> Self {
+        let color = Color::new(r, g, b);
+        Self::Solid(color)
+    }
+}
+
+impl Default for Texture {
+    fn default() -> Self {
+        Self::Solid(Vec3::new(0.5, 0.5, 0.6).into())
+    }
+}
 
 pub trait Scatter {
     fn scatter(&self, ray: &Ray, hit: &Hit) -> Option<Reflection>;
@@ -12,12 +37,12 @@ pub trait Scatter {
 pub enum Material {
     Dielectric(Vec3, f32),
     Metal(Vec3, f32),
-    Lambertian(Vec3),
+    Lambertian(Texture),
 }
 
 impl Default for Material {
     fn default() -> Self {
-        Self::Lambertian(Vec3::new(0.5, 0.5, 0.6))
+        Self::Lambertian(Texture::default())
     }
 }
 
@@ -69,7 +94,7 @@ impl Scatter for Material {
                 let scatter_direction = hit.normal + random_point_lambertian();
 
                 let reflection = Reflection {
-                    attenuation: *albedo,
+                    attenuation: albedo.value(),
                     scatter: Ray::new(hit.point, scatter_direction, ray.time()),
                 };
 

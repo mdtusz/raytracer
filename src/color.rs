@@ -53,6 +53,26 @@ impl Into<Color> for Vec3 {
     }
 }
 
+impl Into<Vec3> for Color {
+    fn into(self) -> Vec3 {
+        let r = self.r() as f32 / 256.0;
+        let g = self.g() as f32 / 256.0;
+        let b = self.b() as f32 / 256.0;
+
+        Vec3::new(r, g, b)
+    }
+}
+
+impl Into<Vec3> for &Color {
+    fn into(self) -> Vec3 {
+        let r = self.r() as f32 / 256.0;
+        let g = self.g() as f32 / 256.0;
+        let b = self.b() as f32 / 256.0;
+
+        Vec3::new(r, g, b)
+    }
+}
+
 impl std::fmt::Display for Color {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{} {} {}", self.0, self.1, self.2)

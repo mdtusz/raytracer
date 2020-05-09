@@ -43,6 +43,7 @@ impl Ray {
 
     pub fn trace(&self, world: &World, depth: u32) -> Vec3 {
         if depth <= 0 {
+            // Black if we have exceeded the max depth.
             return Vec3::default();
         }
 

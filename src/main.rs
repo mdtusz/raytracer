@@ -18,23 +18,25 @@ mod world;
 
 use camera::Camera;
 use color::Color;
-use materials::Material;
+use materials::{Material, Texture};
 use pixmap::PixMap;
 use ray::Ray;
 use shapes::Sphere;
 use world::World;
 
 fn main() {
-    let aa_samples = 2;
-    let max_depth = 8;
+    let aa_samples = 4;
+    let max_depth = 128;
     let width = 1920;
     let height = 1080;
 
     let mut pm = PixMap::new(width, height);
 
-    let navy = Material::Lambertian(Vec3::new(0.2, 0.5, 0.8));
-    let red = Material::Lambertian(Vec3::new(0.8, 0.2, 0.4));
-    let green = Material::Lambertian(Vec3::new(0.2, 0.3, 0.22));
+    let _red = Texture::solid(200, 48, 112);
+    let _green = Texture::solid(40, 180, 40);
+
+    let red = Material::Lambertian(_red);
+    let green = Material::Lambertian(_green);
     let mirror = Material::Metal(Vec3::new(0.5, 0.5, 0.5), 0.0);
     let blur_mirror = Material::Metal(Vec3::new(0.21, 0.2, 0.2), 0.3);
     let glass = Material::Dielectric(Vec3::new(1.0, 1.0, 1.0), 1.55);
