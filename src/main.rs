@@ -131,7 +131,7 @@ fn main() {
     pm.save().unwrap();
     println!("Done.");
 
-    while window.is_open() && !window.is_key_down(Key::Escape) {
+    while window.is_open() && !window.is_key_down(Key::Q) {
         window.update();
         window
             .update_with_buffer(&pm.to_hex(), pm.width as usize, pm.height as usize)
