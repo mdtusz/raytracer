@@ -1,4 +1,4 @@
-use rand::random;
+use rand::{prelude::*, random};
 use ultraviolet::Vec3;
 
 use crate::color::Color;
@@ -8,12 +8,89 @@ use crate::{Hit, Ray};
 #[derive(Clone)]
 pub enum Texture {
     Solid(Color),
+    Checker(Box<Texture>, Box<Texture>),
+    Perlin(PerlinNoise),
+}
+
+#[derive(Clone)]
+pub struct PerlinNoise {
+    size: usize,
+    x_permute: Vec<usize>,
+    y_permute: Vec<usize>,
+    z_permute: Vec<usize>,
+    random_values: Vec<f32>,
+}
+
+impl PerlinNoise {
+    pub fn new(size: usize) -> Self {
+        Self {
+            size: size,
+            x_permute: Self::generate_permutation(size),
+            y_permute: Self::generate_permutation(size),
+            z_permute: Self::generate_permutation(size),
+            random_values: Self::generate_randoms(size),
+        }
+    }
+
+    pub fn noise(&self, point: &Vec3) -> f32 {
+        let mut u = point.x - point.x.floor();
+        let mut v = point.y - point.y.floor();
+        let mut w = point.z - point.z.floor();
+
+        u = u * u * (3.0 - 2.0 * u);
+        v = v * v * (3.0 - 2.0 * v);
+        w = w * w * (3.0 - 2.0 * w);
+
+        let i = 4 * point.x as usize & (self.size - 1);
+        let j = 4 * point.y as usize & (self.size - 1);
+        let k = 4 * point.z as usize & (self.size - 1);
+
+        self.random_values[self.x_permute[i] ^ self.y_permute[j] ^ self.z_permute[k]]
+    }
+
+    fn generate_permutation(count: usize) -> Vec<usize> {
+        let mut p = Vec::new();
+
+        for i in 0..count {
+            p.push(i);
+        }
+
+        for i in (count - 1)..=0 {
+            let target = thread_rng().gen_range(0, i);
+            let tmp = p[i];
+            p[i] = p[target];
+            p[target] = tmp;
+        }
+
+        p
+    }
+
+    fn generate_randoms(count: usize) -> Vec<f32> {
+        let mut randoms = Vec::new();
+
+        for _ in 0..count {
+            randoms.push(random());
+        }
+
+        randoms
+    }
 }
 
 impl Texture {
-    pub fn value(&self) -> Vec3 {
+    pub fn value(&self, hit: &Hit) -> Vec3 {
         match self {
             Self::Solid(c) => c.into(),
+            Self::Checker(a, b) => {
+                let sines = (10.0 * hit.point.x).sin()
+                    * (10.0 * hit.point.y).sin()
+                    * (10.0 * hit.point.z).sin();
+                if sines < 0.0 {
+                    a.value(hit)
+                } else {
+                    b.value(hit)
+                }
+            }
+            Self::Perlin(noise) => Vec3::new(1.0, 1.0, 1.0) * noise.noise(&hit.point),
         }
     }
 
@@ -36,7 +113,7 @@ pub trait Scatter {
 #[derive(Clone)]
 pub enum Material {
     Dielectric(Vec3, f32),
-    Metal(Vec3, f32),
+    Metal(Texture, f32),
     Lambertian(Texture),
 }
 
@@ -81,7 +158,7 @@ impl Scatter for Material {
 
                 if scatter.direction().dot(hit.normal) > 0.0 {
                     let reflection = Reflection {
-                        attenuation: *albedo,
+                        attenuation: albedo.value(hit),
                         scatter,
                     };
 
@@ -94,7 +171,7 @@ impl Scatter for Material {
                 let scatter_direction = hit.normal + random_point_lambertian();
 
                 let reflection = Reflection {
-                    attenuation: albedo.value(),
+                    attenuation: albedo.value(hit),
                     scatter: Ray::new(hit.point, scatter_direction, ray.time()),
                 };
 

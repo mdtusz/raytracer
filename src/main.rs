@@ -18,29 +18,32 @@ mod world;
 
 use camera::Camera;
 use color::Color;
-use materials::{Material, Texture};
+use materials::{Material, PerlinNoise, Texture};
 use pixmap::PixMap;
 use ray::Ray;
 use shapes::Sphere;
 use world::World;
 
 fn main() {
-    let aa_samples = 4;
-    let max_depth = 128;
+    let aa_samples = 2048;
+    let max_depth = 4096;
     let width = 1920;
     let height = 1080;
 
     let mut pm = PixMap::new(width, height);
 
-    let _red = Texture::solid(200, 48, 112);
-    let _green = Texture::solid(40, 180, 40);
+    let _red = Texture::solid(255, 255, 255);
+    let _green = Texture::solid(20, 20, 20);
+    let _grey = Texture::Checker(Box::new(_red.clone()), Box::new(_green.clone()));
+    let _noise = Texture::Perlin(PerlinNoise::new(256));
 
-    let red = Material::Lambertian(_red);
+    let noise = Material::Lambertian(_noise);
+    let red = Material::Lambertian(_red.clone());
     let green = Material::Lambertian(_green);
-    let mirror = Material::Metal(Vec3::new(0.5, 0.5, 0.5), 0.0);
-    let blur_mirror = Material::Metal(Vec3::new(0.21, 0.2, 0.2), 0.3);
+    let mirror = Material::Metal(_red.clone(), 0.0);
+    let blur_mirror = Material::Metal(_grey.clone(), 0.3);
     let glass = Material::Dielectric(Vec3::new(1.0, 1.0, 1.0), 1.55);
-    let amber = Material::Dielectric(Vec3::new(1.0, 0.8, 0.78), 1.31);
+    let amber = Material::Dielectric(Vec3::new(1.0, 0.8, 0.88), 1.31);
 
     let s1 = Sphere::new(Vec3::new(0.0, -100.5, 0.0), 100.0, blur_mirror.clone());
     let s2 = Sphere::new(Vec3::new(0.0, 0.0, -10.0), 1.0, mirror.clone());
@@ -62,13 +65,13 @@ fn main() {
 
     let camera = Camera::new(
         Vec3::new(0.0, 2.0, 10.0),
-        Vec3::new(0.0, 1.0, 0.0),
+        Vec3::new(-0.9, 0.9, 0.0),
         pm.aspect_ratio(),
-        2.0 / 2.0,
+        1.0 / 2.0,
         10.0,
         0.05,
         0.0,
-        1.0,
+        0.8,
     );
 
     let mut options = WindowOptions::default();
